@@ -18,6 +18,7 @@
 # Dither tools: http://avisynth.nl/index.php/Dither_tools                          #
 # neo_dfttest: https://github.com/HomeOfAviSynthPlusEvolution/neo_DFTTest/releases #
 # KNLMeansCL: https://github.com/pinterf/KNLMeansCL/releases                       #
+# BM3D: https://github.com/WolframRhodium/VapourSynth-BM3DCUDA/issues/7            #
 # FFT3DGPU: https://github.com/pinterf/FFT3dGPU/releases                           #
 # HQdn3D: http://avisynth.nl/index.php/Hqdn3d                                      #
 # old FFT3DFilter: https://github.com/pinterf/fft3dfilter/releases                 #
@@ -115,6 +116,8 @@
 # Feb 07, 2021: v2.3.1
 # - tune grainLevel 1 to fit more centrally between 0 and 2
 # - reorganize arguments by impoprtance
+# Aug 12, 2021: mod by kedautinh12
+# - add BM3D_CPU & BM3D_CUDA (based on BM3D prefilter of Dogway's SMDegrain)
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
@@ -141,7 +144,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
   limitSigma= default( limitSigma, Select( autoTune, 8,12,16,32 ) )    # strength of filtering for limit clip
   limitBlksz= default( limitBlksz, Select( autoTune,16,24,32,64 ) )    # FFT3D blocksize
  
-  postFFT = default( postFFT,   0 )         # Whether the FFT post processing takes place, deminishes remaining noise, 1 is fast but produces some banding, 3 is of high quality but slow, 2 and 4 are GPU based versions. -1 is the fastest smoothing, equivalent behaviour of TemporalDegrain v1.23.
+  postFFT = default( postFFT,   0 )         # Whether the FFT post processing takes place, deminishes remaining noise, 1 is fast but produces some banding, 3 is of high quality but slow, 5 is of very high quality but slowest, 2, 4 and 6 are GPU based versions. -1 is the fastest smoothing, equivalent behaviour of TemporalDegrain v1.23.
   postTR  = default( postTR,    1 )         # Temporal radius of FFT processing, increasing to 2 does not help much, but is much slower
   postSigma=default( postSigma,1.0)         # Strength of the filtering
   postDither=default(postDither,-1)         # any negative value enables 16bit post FFT with a final call to ditherpost, positive values are dithering strength for dfttest
@@ -164,6 +167,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
   maxTR = (degrainTR > postTR) ? degrainTR : postTR
   LumaNoise = (degrainPlane == 0) || (degrainPlane == 4)
   ChromaNoise = (degrainPlane > 0) ? true : false
+  Chr = ChromaNoise ? 3 : 1
   inHighBits = input.BitsPerComponent()>8
   postDither = inHighBits ? 0 : postDither
 
@@ -322,7 +326,9 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
              (postFFT == 2) ? FFT3DGPU( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma*2/3, bt=postTD ) : \
              (postFFT == 3) ? neo_dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, threads=fftThreads ) : \
              (postFFT == 13)? dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, Y=LumaNoise, U=ChromaNoise, V=ChromaNoise, sigma=postSigma*4, tbsize=postTD, threads=fftThreads, dither=dftDither ) : \
-             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=postSigma*0.5, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=knlDevId) : \
+             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=postSigma*0.5, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=knlDevId ) : \
+             (postFFT == 5) ? DT_BM3DCPU( noiseWindow, radius=postTR, sigma=postSigma, UV=Chr ) : \
+             (postFFT == 6) ? DT_BM3DCUDA( noiseWindow, radius=postTR, sigma=postSigma, UV=Chr, device_id=knlDevId ) : \
              (postFFT == -1)? noiseWindow.HQDn3D(0,0,4,1) : NOP()
   dnWindow = dnWindow.SelectEvery( postTD, postTR )
   denoised = forceHiBitProc && postFFT > 0  ? dnWindow.ConvertBits(8,dither=1) : dnWindow
@@ -401,7 +407,52 @@ function DT_KNLMeansCL(clip input, String "device_type", int "device_id", bool "
     (Luma && Chroma) ? YToUV(output.ExtractU().BilinearResize(cw,ch), output.ExtractV().BilinearResize(cw,ch), output.ExtractY()) : Luma ? YToUV(uplane, vplane, output) : output
 }
 
+function DT_BM3DCPU(clip a, float "sigma", int "radius", int "UV") {
 
+    rgb = isRGB(a)
+    isy = isy(a)
+    bi  = BitsPerComponent(a)
+
+    s  = Default(sigma,    3)
+    r  = Default(radius,   1)
+    UV = Default(UV, rgb ? 3 : 1)
+
+    ch = !(isy || UV!=3)
+    ch ? ConverttoYUV444(a) : a
+	ConvertBits(bits=32)
+
+    BM3D_CPU(sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch)
+    BM3D_VAggregate(radius=r)
+
+    if (bi < 32) {
+        ConvertBits(bits=16, dither=-1)
+        ConvertBits(bits=bi, dither= 1)
+    }
+    ch ? MatchColorFormat(a) : mergechroma(a) }
+    
+function DT_BM3DCUDA(clip a, float "sigma", int "radius", int "UV", int "device_id") {
+
+    rgb = isRGB(a)
+    isy = isy(a)
+    bi  = BitsPerComponent(a)
+
+    s  = Default(sigma,    3)
+    r  = Default(radius,   1)
+    UV = Default(UV, rgb ? 3 : 1)
+
+    ch = !(isy || UV!=3)
+    ch ? ConverttoYUV444(a) : a
+	ConvertBits(bits=32)
+
+    BM3D_CUDA(sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch, fast=true, extractor_exp=6)
+    BM3D_VAggregate(radius=r)
+
+    if (bi < 32) {
+        ConvertBits(bits=16, dither=-1)
+        ConvertBits(bits=bi, dither= 1)
+    }
+    ch ? MatchColorFormat(a) : mergechroma(a) }
+    
 # Set global variable called "Prefix_Name" to "Value". Throws exception if global already exists unless Replace=true, in which case the global is overwritten
 function DT_SetUserGlobal( string Prefix, string Name, val Value, bool "Replace" )
 {
