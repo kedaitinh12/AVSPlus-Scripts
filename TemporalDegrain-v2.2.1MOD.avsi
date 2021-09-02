@@ -1,26 +1,56 @@
 ####################################################################################
-# Temporal Degrain v2.2.0 Updated by ErazorTT                                      #
+# Temporal Degrain v2.3.1 Updated by ErazorTT                                      #
 #                                                                                  #
-# Function v1.23 by Sagekilla, idea + original script created by Didee      	   #
-#                                                                           	   #
-# Works as a simple temporal degraining function that'll remove             	   #
-# MOST or even ALL grain and noise from video sources,                      	   #
-# including dancing grain, like the grain found on 300.                     	   #
-# Also note, the parameters don't need to be tweaked much.                  	   #
-#                                                                           	   #
-# Required plugins:                                                         	   #
+# Function v1.23 by Sagekilla, idea + original script created by Didee             #
+#                                                                                  #
+# Works as a simple temporal degraining function that'll remove                    #
+# MOST or even ALL grain and noise from video sources,                             #
+# including dancing grain, like the grain found on 300.                            #
+# Also note, the parameters don't need to be tweaked much.                         #
+#                                                                                  #
+# Required plugins:                                                                #
 # neo_fft3d: https://github.com/HomeOfAviSynthPlusEvolution/neo_FFT3D/releases     #
-# MaskTools2: https://github.com/pinterf/masktools/releases                 	   #
-# MVtools2 (mt_*): https://github.com/pinterf/mvtools/releases              	   #
-# rgTools (RemoveGrain,Repair): https://github.com/pinterf/RgTools/releases 	   #
-#                                                                           	   #
-# Optional plugins:                                                         	   #
-# Dither tools: http://avisynth.nl/index.php/Dither_tools                   	   #
+# MaskTools2: https://github.com/pinterf/masktools/releases                        #
+# MVtools2 (mt_*): https://github.com/pinterf/mvtools/releases                     #
+# rgTools (RemoveGrain,Repair): https://github.com/pinterf/RgTools/releases        #
+#                                                                                  #
+# Optional plugins:                                                                #
+# Dither tools: http://avisynth.nl/index.php/Dither_tools                          #
 # neo_dfttest: https://github.com/HomeOfAviSynthPlusEvolution/neo_DFTTest/releases #
-# KNLMeansCL: https://github.com/pinterf/KNLMeansCL/releases                	   #
-# FFT3DGPU: https://github.com/pinterf/FFT3dGPU/releases                    	   #
-# HQdn3D: http://avisynth.nl/index.php/Hqdn3d                               	   #
+# KNLMeansCL: https://github.com/pinterf/KNLMeansCL/releases                       #
+# FFT3DGPU: https://github.com/pinterf/FFT3dGPU/releases                           #
+# HQdn3D: http://avisynth.nl/index.php/Hqdn3d                                      #
+# old FFT3DFilter: https://github.com/pinterf/fft3dfilter/releases                 #
+# old dfttest: https://github.com/pinterf/dfttest                                  #
 ####################################################################################
+
+# recommendations to be followed for each new movie:
+# 1. start with default settings
+# 2. if less denoising is needed set grainLevel to 0, if you need more degraining start over reading at next paragraph
+# 3. if you need even less denoising:
+#    - EITHER: set outputStage to 1 or even 0
+#    - OR: use the postMix setting and increase the value from 0 to as much as 100
+
+# recommendations for strong degraining: 
+# 1. start with default settings
+# 2. search the noisiest* patch of the entire movie, enable grainLevelSetup (=true), zoom in as much as you can and prepare yourself for pixel peeping. (*it really MUST be the noisiest region where you want this filter to be effective)
+# 3. compare the output on this noisy* patch of your movie with different settings of grainLevel (0,1,2) and use the setting where the noise level is lowest (irrespectable of whether you find this to be too much filtering).
+#    If multiple grainLevel settings yield comparable results while grainLevelSetup=true and observing at maximal zoom be sure to use the lowest setting! If you're unsure leave it at the default (2), your result might no be optimal, but it will still be great.
+# 4. disable grainLevelSetup (=false), or just remove this argument from the function call. Now revert the zoom and look from a normal distance at different scenes of the movie and decide if you like what you see.
+# 5. if more denoising is needed try postFFT=1 with postSigma=1, then tune postSigma (obvious blocking and banding of regions in the sky are indications of a value which is at least a factor 2 too high)
+# 6. if you would need a postSigma of more than 2, try first to increase degrainTR. The goal is to balance postSigma and degrainTR, some prefer more simga and others more TR, it's up to you. However, do not increase degrainTR above 1/8th of the fps (at 24fps up to 3).
+# 7. if there are any issues with banding or you cranked up postSigma a lot try postFFT=3
+
+# use only the following knobs (all other settings should already be where they need to be):
+# - degrainTR (1), temporal radius of degrain, usefull range: min=default=1, max=fps/8. Higher values do clean the video more, but also increase probability of wrongly identified motion vectors which leads to washed out regions
+# - grainLevel (2), if input noise level is relatively low set this to 0. The right setting must be found using grainLevelSetup=true while all other settings are at default. Set this setting such that the noise level is lowest.
+# - grainLevelSetup (false), only to be used while finding the right setting for grainLevel. This will skip all your other settings!
+# - postFFT (0), if you want to remove absolutely all remaining noise suggestion is to use 3 (dfttest) for its quality or 1 (ff3dfilter) is much faster but can introduce banding. 2 and 4 are GPU based versions.
+# - postSigma (1), increase it to remove all the remaining noise you want removed, but do not increase too much since unnecessary high values have severe negative impact on either banding and/or sharpness
+# - postDither (-1), positive values are used as parameter for dfttest (values above 2 can remove preexinsting banding), negative values indicate 16 bits FFT processing (to be used only with postFFT=1 or in case of strong paranoia regarding banding)
+# - degrainPlane (4), if you just want to denoise only the chroma use 3 (helps with compressability with the clip being almost identical to the original)
+# - postMix (0), if the degraining is too strong, increase the value going from 0 to 100
+# - outputStage (2), if the degraining is too strong, you can output earlier stages
 
 # Changelog: 
 # May 15, 2018: v2.0
@@ -63,40 +93,49 @@
 # Feb 24, 2019: v2.2.1
 # - swap deprecated use of ConvertToXbit by ConvertBits
 # - relaxed settings for scene change detection, was too aggressive
+# Apr 12, 2019: v2.2.2
+# - refine input size categorization
+# Feb 02, 2021: v2.2.3
+# - rescale SAD/SCD thresholds when DCT is switched from SAD to SATD
+# - allow change of motion estimation also based on chroma (meChroma)
+# Feb 02, 2021: v2.2.4
+# - use optional high bitdepth processing for FFT3DGPU
+# - added postMix setting do be able to degrease filter strength
+# Feb 02, 2021: v2.2.5
+# - use neo fft
+# - add optional high bitdepth processing for dfttest
+# Feb 05, 2021: v2.2.6
+# - correct scaling for DCT=5 and set it as default
+# Feb 07, 2021: v2.3.0
+# - use native high bit format also for KNLMeansCL
+# - scale sigma of FFT3DGPU
+# - grainLevel is now interger range 0-2
+# - make setup of grainLevel easier by using parameter grainLevelSetup=true
+# - provide user with the choice which stage of the pipeline to output (outputStage)
+# Feb 07, 2021: v2.3.1
+# - tune grainLevel 1 to fit more centrally between 0 and 2
+# - reorganize arguments by impoprtance
 
-# recommendation: 
-# 1. start with default settings
-# 2. compare the output on the noisiest* patch of your movie with grainLevel enabled (=true) and disabled (=false) and use the setting where the noise level is lower. If no method yeilds a significantly result than choose "false". (*it really MUST be the noisiest region of the WHOLE movie)
-# 3. if more denoising is needed try postFFT=1 with postSigma=1 and postDither=-1, then tune postSigma (obvious blocking and banding of regions in the sky are indications of a value which is at least a factor 2 too high)
-# 4. if you would need a postSigma of more than 2, try first to increase degrainTR. The goal is to balance postSigma and degrainTR. However, do not increase degrainTR above 1/8th of the fps (at 24fps up to 3).
-# 5. if there are any issues with banding switch to postFFT=3
-
-# use only the following knobs (all other settings should already be where they need to be):
-# - degrainTR, temporal radius of degrain, usefull range: min=default=1, max=fps/8. Higher values do clean the video more, but also increase probability of wrongly identified motion vectors which leads to washed out regions
-# - grainLevel, if input noise level is relatively low set this to false. This setting must be left enabled if disabling it increases the output noise level while all other settings are at default.
-# - postFFT, if you want to remove absolutely all remaining noise suggestion is to use 3 (neo_dfttest) for its quality or 1 (neo_fft3d) is much faster but can introduce banding. 2 and 4 are GPU based versions.
-# - postSigma, increase it to remove all the remaining noise you want removed, but do not increase too much since unnecessary high values have severe negative impact on either banding and/or sharpness
-# - postDither, positive values are used as parameter for neo_dfttest (values above 2 can remove preexinsting banding), negative values indicate 16 bits FFT processing (to be used only with postFFT=1 or in case of strong paranoia regarding banding)
-# - degrainPlane, if you just want to denoise the chroma use 3 (helps with compressability with the clip being almost identical to the original)
-
-function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", bool "grainLevel", int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", \
-    int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", int "postFFT", int "postTR", float "postSigma", int "postDither", int "knlDevId", \
-    float "ppSAD1", float "ppSAD2", float "ppSCD1", int "thSCD2", int "DCT", float "gaussParam", bool "extraSharp")
+function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
+    int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
+    int "knlDevId", float "ppSAD1", float "ppSAD2", float "ppSCD1", int "thSCD2", int "DCT", float "gaussParam", bool "extraSharp", int "outputStage", bool "debug")
 {
   longlat = (input.Width() > input.Height()) ?  input.Width() : input.Height()
-  autoTune = (longlat<1000) ? 0 : \
-             (longlat<1300) ? 1 : \
-             (longlat<2100) ? 2 : 3
+  shorlat = (input.Width() < input.Height()) ?  input.Width() : input.Height()
+  autoTune = (longlat<=1050 && shorlat<=576) ? 0 : \
+             (longlat<=1280 && shorlat<=720) ? 1 : \
+             (longlat<=2048 && shorlat<1600) ? 2 : 3
 
   degrainTR = default( degrainTR,1 )        # MDegrain temporal radius. 
   degrainPlane = default( degrainPlane, 4 ) # which planes to degrain: 0=luma, 3=chroma, 4=luma+chroma.
-  grainLevel= default( grainLevel, true )   # can be disabled when the noise level of the input is so low that it does not disturb the motion estimation. Thus decreasing probability of smearing of very fine high velocity detail and increasing speed.
+  grainLevel= default( grainLevel, 2 )      # can be set to 0 when the noise level of the input is so low that it does not disturb the motion estimation. Thus decreasing probability of smearing of very fine high velocity detail and increasing speed.
   
   meAlg   = default( meAlg,    4 )          # Motion estimation algorithm (5 might be a little better but is significantly slower, 2 will be a little faster while missing some vectors), https://forum.doom9.org/showthread.php?p=693742
   meAlgPar= default( meAlgPar, Select( meAlg,2,2,2,2,16,24,2,2 ) ) # radius/range parameter for the motion estimation algorithms
   meSubpel= default( meSubpel, Select( autoTune, 4, 2, 2, 1 ) )    # higher values increase motion vector quality at the cost of speed
   meBlksz = default( meBlksz,  Select( autoTune, 8, 8,16,32 ) )    # higher values for more speed, but higher probability of smearing of fine details, do also not go too small so that blocks still have enough content to be distinguishable
   meTM    = default( meTM,     false )      # this is the default of QTGMC and prefered by Didee (https://forum.doom9.org/showthread.php?p=1407409&highlight=truemotion#post1407409)
+  meChroma= default( meChroma, true )       # use also chroma plane for motion vectors
   
   limitFFT= default( limitFFT,  1 )         # Algorithm for producing the limiting clip, 1 for CPU based, 2 for GPU based.
   limitSigma= default( limitSigma, Select( autoTune, 8,12,16,32 ) )    # strength of filtering for limit clip
@@ -105,11 +144,20 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
   postFFT = default( postFFT,   0 )         # Whether the FFT post processing takes place, deminishes remaining noise, 1 is fast but produces some banding, 3 is of high quality but slow, 2 and 4 are GPU based versions. -1 is the fastest smoothing, equivalent behaviour of TemporalDegrain v1.23.
   postTR  = default( postTR,    1 )         # Temporal radius of FFT processing, increasing to 2 does not help much, but is much slower
   postSigma=default( postSigma,1.0)         # Strength of the filtering
-  postDither=default(postDither,-1)         # any negative value enables 16bit post FFT with a final call to ditherpost, positive values are dithering strength for neo_dfttest
+  postDither=default(postDither,-1)         # any negative value enables 16bit post FFT with a final call to ditherpost, positive values are dithering strength for dfttest
+  postMix = default (postMix,   0 )         # increase the value up to 100 if you want less degraining
   knlDevId= default( knlDevId,  0 )
 
   fftThreads = default( fftThreads, 1 )     # Number of threads to be used for FFTs
   extraSharp = default( extraSharp, false)  # enable for a moderate over-sharpen, do not use this if you want the output to be as close to the original as possible, only to be used by sharpness junkies
+  DCT        = default( DCT, 5    )         # default setting of 0 has issues with luminosity changes from one frame to the next (e.g. fade-ins, fade-outs, moving shaddows), the degraining will be much too weak. Setting to 5 will solve this issue, but it's also slower. All other settings apart of 0 and 5 are not to be used!
+  
+  outputStage = default( outputStage, 2 )   # you can decide to skip the processing of later stages and directly output the clip as process of the stage given: 0= output after first degraining, 1= output after second degraining, 2= output after FFT post processing (that's the last stage and the default)
+  grainLevelSetup = default(grainLevelSetup, false)
+  debug      = default (debug, false)
+  
+  outputStage = grainLevelSetup ? 0 : outputStage
+  degrainTR = grainLevelSetup ? 3 : degrainTR
   
   postTR  = (postFFT > 0) ? postTR : 0
   postTD  = postTR * 2 + 1
@@ -119,7 +167,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
   inHighBits = input.BitsPerComponent()>8
   postDither = inHighBits ? 0 : postDither
 
-  ChromaMotion = true #fix!
+  ChromaMotion = meChroma
   GlobalNames = "TD2"
   ReuseGlobals = false
   ReplaceGlobals = false
@@ -132,18 +180,23 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
   PelSearch = SubPel
   TrueMotion = meTM
   GlobalMotion = true #fix!
-  SrchClipPP = grainLevel ? 3 : 0
+  SrchClipPP = (grainLevel > 0) ? 3 : 0
+  gaussParam = default(gaussParam, grainLevel > 1 ? 3.0 : 6.0)
   
   Lambda = ((TrueMotion) ? 1000 : 100 ) * (BlockSize*BlockSize)/(8*8)
   LSAD   = (TrueMotion) ? 1200 : 400
   PNew   = (TrueMotion) ? 50   : 25
   PLevel = (TrueMotion) ? 1    : 0
-  DCT    = default(DCT, 0)
-  thSAD1 = int(default(ppSAD1, 10) *8*8)   #here the per-pixel measure is converted to the per-8x8-Block measure MVTools is using
-  thSAD2 = int(default(ppSAD2,  6) *8*8)   #here the per-pixel measure is converted to the per-8x8-Block measure MVTools is using
-  thSCD1 = int(default(ppSCD1,  5) *8*8)   #here the per-pixel measure is converted to the per-8x8-Block measure MVTools is using
+  ppSAD1 = default(ppSAD1, 10)
+  ppSAD2 = default(ppSAD2, 6)
+  ppSCD1 = default(ppSCD1, 5)
+  ppSAD1 = (DCT == 5) ? (ppSAD1 * 1.7) : ppSAD1 #rescale threshold to match the SAD values when using SATD
+  ppSAD2 = (DCT == 5) ? (ppSAD2 * 1.7) : ppSAD2 #rescale threshold to match the SAD values when using SATD
+  ppSCD1 = ppSCD1 #this must not be scaled since scd is always based on SAD independently of the actual dct setting
+  thSAD1 = int(ppSAD1*8*8)   #here the per-pixel measure is converted to the per-8x8-Block measure MVTools is using
+  thSAD2 = int(ppSAD2*8*8)   #here the per-pixel measure is converted to the per-8x8-Block measure MVTools is using
+  thSCD1 = int(ppSCD1*8*8)   #here the per-pixel measure is converted to the per-8x8-Block measure MVTools is using
   thSCD2 = default(thSCD2, 130)            #MVTools default
-  gaussParam = default(gaussParam, 3.0)
   
   #---------------------------------------
   # Pre-Processing
@@ -167,7 +220,6 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
   hpad = (hpad > 8) ? hpad : 8 # But match default padding if possible
   vpad = (vpad > 8) ? vpad : 8
   
-
   #---------------------------------------
   # Motion Analysis
 
@@ -185,7 +237,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
   CMmt = ChromaMotion ? 3   :  1
   CMts = ChromaMotion ? 255 :  0
   CMrg = ChromaMotion ? 12  : -1
-
+  
   # Remove areas of difference between temporal blurred motion search clip and bob that are not due to bob-shimmer - removes general motion blur
   repair0 = bobbed
   
@@ -204,8 +256,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
     (SrchClipPP == 0) ? repair0 :			     \
     (SrchClipPP < 3)  ? spatialBlur :			 \
     spatialBlur.mt_lutxy( tweaked, "x 7 scalef + y < x 2 scalef + x 7 scalef - y > x 2 scalef - x 51 * y 49 * + 100 / ? ?", U=CMmt, V=CMmt, use_expr=2)
-  #return srchClip
-  
+  #return srchClip.Subtitle("blz:"+String(BlockSize)+" ov:"+String(Overlap)+" se:"+String(Search)+" pa:"+String(SearchParam)+" ps:"+String(PelSearch))
   # Calculate forward and backward motion vectors from motion search clip
   srchSuper = IsClip(srchSuper) ? srchSuper :				\
     (maxTR > 0) ? srchClip.MSuper( pel=SubPel, sharp=SubPelInterp, hpad=hpad, vpad=vpad, chroma=ChromaMotion ) : NOP()
@@ -223,63 +274,69 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "degrainPlane", boo
   #---------------------------------------
   # Degrain
 
-  o  = planarClip
-  s2 = floor( limitSigma * 0.625 ) # See sigma
-  s3 = floor( limitSigma * 0.375 ) # See sigma
-  s4 = floor( limitSigma * 0.250 ) # See sigma
-  overlap = grainLevel ? limitBlksz/2 : limitBlksz/4
-
-  filter = (limitFFT==1) ? o.neo_fft3d ( y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=limitSigma, sigma2=s2, sigma3=s3, sigma4=s4, bt=3, bw=limitBlksz, bh=limitBlksz, ow=overlap, oh=overlap, ncpu=fftThreads ) : \
-           o.FFT3DGPU(plane=degrainPlane, sigma=limitSigma, sigma2=s2, sigma3=s3, sigma4=s4, bt=3, bw=limitBlksz, bh=limitBlksz, ow=overlap, oh=overlap)
-  #filter = grainLevel ? filter.HQdn3D(4,3,6,3) : filter  #for very grainy input this will remove very slightly some more noise
-
+  dgO  = clip
+  dgS2 = floor( limitSigma * 0.625 ) # See sigma
+  dgS3 = floor( limitSigma * 0.375 ) # See sigma
+  dgS4 = floor( limitSigma * 0.250 ) # See sigma
+  dgOvNum = Select(grainLevel, 4, 3, 2)
+  dgOv = limitBlksz/dgOvNum
+  
+  dgLimit = (degrainTR>0 && limitFFT==1) ? dgO.neo_fft3d(y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=limitSigma, sigma2=dgS2, sigma3=dgS3, sigma4=dgS4, bt=3, bw=limitBlksz, bh=limitBlksz, ow=dgOv, oh=dgOv, ncpu=fftThreads ) : \
+            (degrainTR>0 && limitFFT==11)? dgO.FFT3DFilter(plane=degrainPlane, sigma=limitSigma, sigma2=dgS2, sigma3=dgS3, sigma4=dgS4, bt=3, bw=limitBlksz, bh=limitBlksz, ow=dgOv, oh=dgOv, ncpu=fftThreads) : \
+            (degrainTR>0 && limitFFT==2) ? dgO.FFT3DGPU(plane=degrainPlane, sigma=limitSigma, sigma2=dgS2, sigma3=dgS3, sigma4=dgS4, bt=3, bw=limitBlksz, bh=limitBlksz, ow=dgOv, oh=dgOv) : NOP()
+  #dgLimit = grainLevel ? dgLimit.HQdn3D(4,3,6,3) : dgLimit  #for very grainy input this will remove very slightly some more noise
+  
   # "spat" is a prefiltered clip which is used to limit the effect of the 1st MV-denoise stage.
   # For simplicity, we just use the FFT3DFilter. There's lots of other possibilities.
-  spat   = filter
-  spatD  = mt_makediff(o,spat)
-
+  dgSpatD= (degrainTR>0) ? mt_makediff(dgO,dgLimit) : NOP()
+  
   # First MV-denoising stage. Usually here's some temporal-medianfiltering going on.
   # For simplicity, we just use MVDegrain.
-  vmultiDegrain = (degrainTR>0) ? vmulti.SelectRangeEvery(maxTR*2,degrainTR*2) : NOP()
-  o_super = o.MSuper(pel=SubPel, levels=1, chroma=ChromaNoise)
-  NR1 = (degrainTR>0) ? o.MDegrainN(o_super, vmultiDegrain, degrainTR, plane=degrainPlane, thSAD=thSAD1, thSCD1=thSCD1, thSCD2=thSCD2) : o
+  dgVm  = (degrainTR>0) ? vmulti.SelectRangeEvery(maxTR*2,degrainTR*2) : NOP()
+  dgOs  = (degrainTR>0) ? dgO.MSuper(pel=SubPel, levels=1, chroma=ChromaNoise) : NOP()
+  dgNR1 = (degrainTR>0) ? dgO.MDegrainN(dgOs, dgVm, degrainTR, plane=degrainPlane, thSAD=thSAD1, thSCD1=thSCD1, thSCD2=thSCD2) : NOP()
   
   # Limit NR1 to not do more than what "spat" would do.
-  NR1D = mt_makediff(o,NR1)
-  DD   = mt_lutxy(spatD,NR1D,"x range_half - abs y range_half - abs < x y ?",use_expr=2)
-  NR1x = mt_makediff(o,DD,U=2,V=2)
-
+  dgNR1D = (degrainTR>0) ? mt_makediff(dgO,dgNR1) : NOP()
+  dgDD   = (degrainTR>0) ? mt_lutxy(dgSpatD,dgNR1D,"x range_half - abs y range_half - abs < x y ?",use_expr=2) : NOP()
+  dgNR1x = (degrainTR>0) ? mt_makediff(dgO,dgDD,U=2,V=2) : NOP()
+  
   # Second MV-denoising stage. We use MVDegrain2.
-  NR1x_super = NR1x.MSuper(pel=SubPel, levels=1, chroma=ChromaNoise)
-  NR2 = (degrainTR>0) ? NR1x.MDegrainN(NR1x_super, vmultiDegrain, degrainTR, plane=degrainPlane, thSAD=thSAD2, thSCD1=thSCD1, thSCD2=thSCD2) : o
+  dgNR1xS= (degrainTR>0) ? dgNR1x.MSuper(pel=SubPel, levels=1, chroma=ChromaNoise) : NOP()
+  dgNR2  = (degrainTR>0) ? dgNR1x.MDegrainN(dgNR1xS, dgVm, degrainTR, plane=degrainPlane, thSAD=thSAD2, thSCD1=thSCD1, thSCD2=thSCD2) : dgO
   
   #---------------------------------------
   # post FFT
 
-  fullClip = NR2
+  fullClip = dgNR2
   
   fullSuper = (postTR > 0) ? fullClip.MSuper( pel=subpel, levels=1, chroma=ChromaNoise ) : NOP() 
   noiseWindow = (postTR == 0) ? fullClip :				\
                 fullClip.MCompensate( fullSuper, vmulti.SelectRangeEvery(maxTR*2,postTR*2), tr=postTR, center=true, thSAD=thSAD2, thSCD1=thSCD1, thSCD2=thSCD2 )
                            
   dftDither = (postDither > 0) ? postDither : 0
-  lsbd = (postDither < 0) ? true : false
+  forceHiBitProc = (postDither < 0) ? true : false
   dnWindow = (postFFT == 0) ? noiseWindow.RemoveGrain(mode=1) :				\
-             (postFFT == 1) ? neo_fft3d ( lsbd ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma, bt=postTD, ncpu=fftThreads ) : \
-             (postFFT == 2) ? FFT3DGPU( noiseWindow, plane=degrainPlane, sigma=postSigma, bt=postTD ) : \
-             (postFFT == 3) ? neo_dfttest( lsbd ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, fft_threads=fftThreads ).ConvertToStacked() : \
-             (postFFT == 4) ? DT_KNLMeansCL( lsbd ? noiseWindow.Dither_convert_8_to_16() : noiseWindow, a=2, d=postTR, h=postSigma*0.5, Luma = LumaNoise, Chroma = ChromaNoise, stacked=lsbd, device_type="GPU", device_id=knlDevId) : \
-                              noiseWindow.HQDn3D(0,0,4,1)
+             (postFFT == 1) ? neo_fft3d ( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma, bt=postTD, ncpu=fftThreads ) : \
+             (postFFT == 11)? FFT3DFilter( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma, bt=postTD, ncpu=fftThreads ) : \
+             (postFFT == 2) ? FFT3DGPU( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma*2/3, bt=postTD ) : \
+             (postFFT == 3) ? neo_dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, threads=fftThreads ) : \
+             (postFFT == 13)? dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, Y=LumaNoise, U=ChromaNoise, V=ChromaNoise, sigma=postSigma*4, tbsize=postTD, threads=fftThreads, dither=dftDither ) : \
+             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=postSigma*0.5, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=knlDevId) : \
+             (postFFT == -1)? noiseWindow.HQDn3D(0,0,4,1) : NOP()
   dnWindow = dnWindow.SelectEvery( postTD, postTR )
-  NR3 = lsbd && (postFFT == 1) ? dnWindow.ConvertBits(8,dither=1) : \ 
-        lsbd && (postFFT == 3 || postFFT == 4) ? dnWindow.ditherpost(mode=6, Y=LumaNoise?3:2, U=ChromaNoise?3:2, V=ChromaNoise?3:2, slice=false) : dnWindow
+  denoised = forceHiBitProc && postFFT > 0  ? dnWindow.ConvertBits(8,dither=1) : dnWindow
 
-  sharpened = DT_ContraSharpening(NR3, o, extraSharp)
+  sharpened = DT_ContraSharpening(denoised, dgO, extraSharp)
+  
+  # mix with original to leave the posibility to decrease the denoising strength
+  sharpened = postMix > 0 ? mt_lutxy(dgO,sharpened,"x "+String(postMix)+" * y "+String(int(100-postMix))+" * + 100 /") : sharpened
 
   # Crop off temporary vertical padding
   cropped = sharpened
   
-  return cropped
+  output = debug ? Select(outputStage, dgNR1x, dgNR2, cropped, repair0, spatialBlur, srchClip, dgLimit, denoised) : Select(outputStage, dgNR1x, dgNR2, cropped)
+  return output
 }
 
 # contra-sharpening: sharpen the denoised clip, but don't add more to any pixel than what was removed previously.
@@ -340,7 +397,7 @@ function DT_KNLMeansCL(clip input, String "device_type", int "device_id", bool "
     channels = Select( (Luma ? 1 : 0) + (Chroma ? 2 : 0), 0, "Y", "UV", "YUV" )
     strength = (Luma && Chroma) ? h*9/16 : Luma ? h : h/4.7
     temp = (Luma && Chroma) ? YToUV(uplane.BilinearResize(yw,yh), vplane.BilinearResize(yw,yh), input.ExtractY()) : Luma ? input.ExtractY() : input
-    output = KNLMeansCL(temp, a=a, d=d, h=strength, channels = channels, stacked=stacked, device_type="GPU")
+    output = KNLMeansCL(temp, a=a, d=d, h=strength, channels = channels, stacked=stacked)
     (Luma && Chroma) ? YToUV(output.ExtractU().BilinearResize(cw,ch), output.ExtractV().BilinearResize(cw,ch), output.ExtractY()) : Luma ? YToUV(uplane, vplane, output) : output
 }
 
