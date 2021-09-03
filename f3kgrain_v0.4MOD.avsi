@@ -6,11 +6,13 @@
 ###                                             ###
 ###              v0.4 - 21 May 2012             ###
 ###                                             ###
+###      mod by kedautinh12 - 05 July 2021      ###
+###                                             ###
 ###################################################
 ###
 ### Fast luma-adaptive grain generator
 ###
-### Temporal soften strength of grain is changeable ( it can only be set on/off in f3kdb )
+### Temporal soften strength of grain is changeable ( it can only be set on/off in F3KDB_3 )
 ###
 ###
 ### +---------+
@@ -24,15 +26,30 @@
 ### +----------------+
 ### |  REQUIREMENTS  |
 ### +----------------+
+###	
+###    Plugins:
+### -> SysInfo
+### -> RT_Stats
+### -> flash3kyuu_deband
+### -> neo-f3kdb      
+### -> MaskTools2        [v2.0a48]
+### -> RgTools
+### -> dither            [v1.17.0]
 ###
-### -> f3kdb           [v1.5.1]
-### -> MaskTools2     [v2.0a48]
-### -> RemoveGrain    [v1.0pre]
-### -> dither         [v1.17.0]
+###    Scipts:
+### -> F3KDB_s           [v1.3+] (https://raw.githubusercontent.com/realfinder/AVS-Stuff/Community/avs%202.5%20and%20up/F3KDB_s.avsi)
+### -> Zs_RF_Shared      [1.154+] https://raw.githubusercontent.com/realfinder/AVS-Stuff/Community/avs%202.5%20and%20up/Zs_RF_Shared.avsi)
+### -> mt_xxpand_multi
+### -> dither
+### -> ExTools           [3.0+] (https://raw.githubusercontent.com/Dogway/Avisynth-Scripts/master/ExTools.avsi)
 ###
 ### +-----------+
 ### | CHANGELOG |
 ### +-----------+
+###
+### mod - 05 July 2021
+###     - Replace MaskTools2 with ExTools
+###     - Replace f3db with F3KDB_3
 ###
 ### v0.4 - 21 May 2012
 ###      - Add support for 8-bit YV16/YV24
@@ -70,10 +87,10 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
   Lclip = lsb ? input.f3kg_get_msb : input
 
   Lmask = adapt==0   ? Lclip.RemoveGrain(19, -1)
-  \     : adapt==255 ? Lclip.mt_invert(U=1, V=1).RemoveGrain(19, -1)
-  \     :              Lclip.mt_lut("x "+string(adapt)+" - abs 255 * "+string(adapt)+" 128 - abs 128 + /", U=1, V=1).RemoveGrain(19, -1)
+  \     : adapt==255 ? Lclip.ex_invert(UV=1).RemoveGrain(19, -1)
+  \     :              Lclip.ex_lut("x "+string(adapt)+" - abs 255 * "+string(adapt)+" 128 - abs 128 + /", UV=1).RemoveGrain(19, -1)
 
-  grain = Lclip.BlankClip(color_yuv=$808080).f3kdb(Y=0, Cb=0, Cr=0, grainY=luma, grainC=chroma, dynamic_grain=true, random_algo_grain=mode, random_param_grain=sigma)
+  grain = Lclip.BlankClip(color_yuv=$808080).F3KDB_3(Y=0, Cb=0, Cr=0, grainY=luma, grainC=chroma, dynamic_grain=true, random_algo_grain=mode, random_param_grain=sigma)
 
   gsoft = (luma!=0 && chroma!=0) ? grain.TemporalSoften(1, 255, 255, scenechange=255, mode=2)
   \     :  luma!=0               ? grain.TemporalSoften(1, 255,   0, scenechange=255, mode=2)
@@ -88,7 +105,7 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
   \      :  chroma!=0             ? MergeChroma(grain, gsoft, temp/100.)
   \      :                          grain
 
-  adsoft = lsb ? Dither_add16(input, gmerge.f3kg_convert_8_to_16, dif=true, Y=Y, U=U, V=V) : mt_adddiff(input, gmerge, Y=Y, U=U, V=V)
+  adsoft = lsb ? Dither_add16(input, gmerge.f3kg_convert_8_to_16, dif=true, Y=Y, U=U, V=V) : ex_adddiff(input, gmerge, Y=Y, UV=U)
 
   b_luma = chroma!=0 && ( Lmask.IsYV12 || lsb ) ? True : False
   Lmask  = !b_luma && chroma!=0 ? Lmask.MergeChroma( Lmask.YToUV(Lmask).BilinearResize(Lmask.width, Lmask.height) )
@@ -96,7 +113,7 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
 
   return adapt==-1 ? adsoft
   \                : lsb ? f3kg_merge16_8(adsoft, input, Lmask, luma=b_luma, Y=Y, U=U, V=V)
-  \                      : mt_merge(adsoft, input, Lmask, luma=b_luma, Y=Y, U=U, V=V)
+  \                      : ex_merge(adsoft, input, Lmask, luma=b_luma, Y=Y, UV=U)
 }
 
 # ==============================================
