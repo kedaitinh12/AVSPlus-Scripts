@@ -1,5 +1,5 @@
 ###############
-# F3KDB_3 and it sisters v1.339
+# F3KDB_3 and it sisters v1.339 by real.finder Mod by kedautinh12 2021.09.03 (replace Masktools2 with extools)
 
 
 function F3KDB_3(clip clip, int "range", int "Y", int "Cb", int "Cr", \
@@ -51,7 +51,7 @@ pclip.neo_F3KDB(range, Y, Cb, Cr, \
 
 pclip = masking && (nlpmsk ? pass < 2 : true) && outd2 != input_depth ? pclip.convertbits(outd2,dither=outd2 < input_depth ? 1 : undefined) : pclip
 
-masking && (nlpmsk ? pass < 2 : true) ? mt_merge(last,pclip,pclip.F3KDB_3_masking(mask_thr, mask_radius), u=chroma ? 3 : 2, v=chroma ? 3 : 2, luma=chroma) : last
+masking && (nlpmsk ? pass < 2 : true) ? ex_merge(last,pclip,pclip.F3KDB_3_masking(mask_thr, mask_radius), UV=chroma ? 3 : 2, luma=chroma) : last
 
 noutput_mode==1 ? pclip.convertbits(16,false).ConvertToStacked() : noutput_mode==2 ? pclip.convertbits(16,false).ConvertToDoubleWidth() : last
 
@@ -205,7 +205,7 @@ dosep && ktvr ? keep_tv_range ? sisphbd ? Limiter(16, 235, 16, 240, paramscale=t
 input_depth = defined(input_depth) ? input_depth : input_mode!=0 ? 16 : hbdbits
 output_depth = defined(output_depth) ? output_depth : sischbd ? hbdbits : output_mode>0 ? 16 : 8
 pclip = masking && (lpmsk ? pass < 2 : true) && output_mode == 3 && output_depth != input_depth ? pclip.convertbits(output_depth,dither=output_depth < input_depth ? 1 : undefined) : pclip
-masking && (lpmsk ? pass < 2 : true) ? sm4i16 || output_mode == 1 ? Dither_merge16_8(last,input_mode!=1 ? pclip.Bitdepth(from=input_mode==2 ? 16 : 8, to=88) : pclip,input_mode!=0 ? pclip.Bitdepth(from=input_mode==2 ? 16 : 88, to=8).F3KDB_3_masking(mask_thr, mask_radius) : pclip.F3KDB_3_masking(mask_thr, mask_radius), luma=chroma) : mt_merge(last,pclip,pclip.F3KDB_3_masking(mask_thr, mask_radius), u=chroma ? 3 : 2, v=chroma ? 3 : 2, luma=chroma) : last
+masking && (lpmsk ? pass < 2 : true) ? sm4i16 || output_mode == 1 ? Dither_merge16_8(last,input_mode!=1 ? pclip.Bitdepth(from=input_mode==2 ? 16 : 8, to=88) : pclip,input_mode!=0 ? pclip.Bitdepth(from=input_mode==2 ? 16 : 88, to=8).F3KDB_3_masking(mask_thr, mask_radius) : pclip.F3KDB_3_masking(mask_thr, mask_radius), luma=chroma) : ex_merge(last,pclip,pclip.F3KDB_3_masking(mask_thr, mask_radius), UV=chroma ? 3 : 2, luma=chroma) : last
 output_mode = sm4i16 ? 2 : output_mode
 sm4i16 ? Bitdepth(from=88, to=16) : last
 
@@ -229,13 +229,14 @@ mthr = default(mask_thr, 2)
 mrad = default(mask_radius, 2)
 Assert(mrad > 0, "F3KDB_3_masking: mask_radius must be more than 0")
 
-thr_lo = string(max(mthr * 0.75, 1) - 0.0001)
-thr_hi = string(max(mthr,         1) + 0.0001)
+thr_lo = ex_bs(max(mthr * 0.75, 1) - 0.0001, 8, bi, fulls=fs)
+thr_hi = ex_bs(max(mthr,        1) + 0.0001, 8, bi, fulls=fs)
 
 c
-mrad > 1 ? sisavs26 ? mt_lutxy (mt_expand_multi (sw=mrad, sh=mrad, mode="ellipse"), mt_inpand_multi (sw=mrad, sh=mrad, mode="ellipse"), "x y -",clamp_float=true, use_expr=1) : mt_lutxy (mt_expand_multi (sw=mrad, sh=mrad, mode="ellipse"), mt_inpand_multi (sw=mrad, sh=mrad, mode="ellipse"), "x y -") : mt_edge (mode="min/max", thY1=0, thY2=255)
-sisavs26 ? mt_lut (expr="x "+thr_lo+" scalef - "+thr_hi+" scalef "+thr_lo+" scalef - / 0 1 clip range_max *", use_expr=2) : mt_lut (expr="x "+thr_lo+" - "+thr_hi+" "+thr_lo+" - / 0 1 clip 255 *")
-removegrain (22, -1)
+mrad > 1 ? ex_luts (mode="range", pixels=ex_shape (mrad, shape="circle"), clamp_float=true, fulls=fs)  : \
+                   mt_edge (mode="min/max", thY1=0, thY2=255)
+                   ex_lut (Format("x {thr_lo} - {thr_hi} {thr_lo} - / 0 1 clip range_max *"), fulls=fs)
+                   removegrain (22, -1)
 mrad > 1 ? removegrain (11, -1) : last
 mrad > 2 ? removegrain (20, -1) : last
 }
