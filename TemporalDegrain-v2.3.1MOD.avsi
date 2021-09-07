@@ -118,10 +118,12 @@
 # - reorganize arguments by impoprtance
 # Aug 12, 2021: mod by kedautinh12
 # - add BM3D_CPU & BM3D_CUDA (based on BM3D prefilter of Dogway's SMDegrain)
+# Sep 07, 2021: mod by kedautinh12
+# - optimization BM3D (based on BM3D prefilter of Dogway's SMDegrain)
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
-    int "knlDevId", float "ppSAD1", float "ppSAD2", float "ppSCD1", int "thSCD2", int "DCT", float "gaussParam", bool "extraSharp", int "outputStage", bool "debug")
+    int "device_id", float "ppSAD1", float "ppSAD2", float "ppSCD1", int "thSCD2", int "DCT", float "gaussParam", bool "extraSharp", int "outputStage", bool "debug")
 {
   longlat = (input.Width() > input.Height()) ?  input.Width() : input.Height()
   shorlat = (input.Width() < input.Height()) ?  input.Width() : input.Height()
@@ -149,7 +151,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
   postSigma=default( postSigma,1.0)         # Strength of the filtering
   postDither=default(postDither,-1)         # any negative value enables 16bit post FFT with a final call to ditherpost, positive values are dithering strength for dfttest
   postMix = default (postMix,   0 )         # increase the value up to 100 if you want less degraining
-  knlDevId= default( knlDevId,  0 )
+  device_id= default(device_id,  0 )
 
   fftThreads = default( fftThreads, 1 )     # Number of threads to be used for FFTs
   extraSharp = default( extraSharp, false)  # enable for a moderate over-sharpen, do not use this if you want the output to be as close to the original as possible, only to be used by sharpness junkies
@@ -326,9 +328,9 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
              (postFFT == 2) ? FFT3DGPU( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma*2/3, bt=postTD ) : \
              (postFFT == 3) ? neo_dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, threads=fftThreads ) : \
              (postFFT == 13)? dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, Y=LumaNoise, U=ChromaNoise, V=ChromaNoise, sigma=postSigma*4, tbsize=postTD, threads=fftThreads, dither=dftDither ) : \
-             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=postSigma*0.5, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=knlDevId ) : \
-             (postFFT == 5) ? DT_BM3DCPU( noiseWindow, radius=postTR, sigma=postSigma, UV=Chr ) : \
-             (postFFT == 6) ? DT_BM3DCUDA( noiseWindow, radius=postTR, sigma=postSigma, UV=Chr, device_id=knlDevId ) : \
+             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=postSigma, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=device_id ) : \
+             (postFFT == 5) ? DT_BM3D( noiseWindow, radius=postTR, sigma=postSigma, CUDA=false, UV=Chr ) : \
+             (postFFT == 6) ? DT_BM3D( noiseWindow, radius=postTR, sigma=postSigma, CUDA=true, UV=Chr ) : \
              (postFFT == -1)? noiseWindow.HQDn3D(0,0,4,1) : NOP()
   dnWindow = dnWindow.SelectEvery( postTD, postTR )
   denoised = forceHiBitProc && postFFT > 0  ? dnWindow.ConvertBits(8,dither=1) : dnWindow
@@ -407,7 +409,7 @@ function DT_KNLMeansCL(clip input, String "device_type", int "device_id", bool "
     (Luma && Chroma) ? YToUV(output.ExtractU().BilinearResize(cw,ch), output.ExtractV().BilinearResize(cw,ch), output.ExtractY()) : Luma ? YToUV(uplane, vplane, output) : output
 }
 
-function DT_BM3DCPU(clip a, float "sigma", int "radius", int "UV") {
+function DT_BM3D(clip a, float "sigma", int "radius", bool "CUDA", int "UV") {
 
     rgb = isRGB(a)
     isy = isy(a)
@@ -415,37 +417,16 @@ function DT_BM3DCPU(clip a, float "sigma", int "radius", int "UV") {
 
     s  = Default(sigma,    3)
     r  = Default(radius,   1)
-    UV = Default(UV, rgb ? 3 : 1)
+    cd = Default(CUDA,  true)
+    UV = Default(UV,    rgb ? 3 : 1)
 
     ch = !(isy || UV!=3)
-    ch ? ConverttoYUV444(a) : a
-	ConvertBits(bits=32)
+    ch ? ConverttoYUV444(a,chromaresample="spline16") : a
+    ConvertBits(bits=32)
 
-    BM3D_CPU(sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch)
-    BM3D_VAggregate(radius=r)
-
-    if (bi < 32) {
-        ConvertBits(bits=16, dither=-1)
-        ConvertBits(bits=bi, dither= 1)
-    }
-    ch ? MatchColorFormat(a) : mergechroma(a) }
-    
-function DT_BM3DCUDA(clip a, float "sigma", int "radius", int "UV", int "device_id") {
-
-    rgb = isRGB(a)
-    isy = isy(a)
-    bi  = BitsPerComponent(a)
-
-    s  = Default(sigma,    3)
-    r  = Default(radius,   1)
-    UV = Default(UV, rgb ? 3 : 1)
-
-    ch = !(isy || UV!=3)
-    ch ? ConverttoYUV444(a) : a
-	ConvertBits(bits=32)
-
-    BM3D_CUDA(sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch, fast=true, extractor_exp=6)
-    BM3D_VAggregate(radius=r)
+    cd ? BM3D_CUDA(sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch, fast=true, extractor_exp=6, device_id=device_id) : \
+         BM3D_CPU( sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch)
+         BM3D_VAggregate(radius=r)
 
     if (bi < 32) {
         ConvertBits(bits=16, dither=-1)
