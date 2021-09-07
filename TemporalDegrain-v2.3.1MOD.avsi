@@ -323,7 +323,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
   dftDither = (postDither > 0) ? postDither : 0
   forceHiBitProc = (postDither < 0) ? true : false
   dnWindow = (postFFT == 0) ? noiseWindow.RemoveGrain(mode=1) :				\
-             (postFFT == 1) ? neo_fft3d ( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma, bt=postTD, ncpu=fftThreads ) : \
+             (postFFT == 1) ? neo_fft3d( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma, bt=postTD, ncpu=fftThreads ) : \
              (postFFT == 11)? FFT3DFilter( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma, bt=postTD, ncpu=fftThreads ) : \
              (postFFT == 2) ? FFT3DGPU( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma*2/3, bt=postTD ) : \
              (postFFT == 3) ? neo_dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, threads=fftThreads ) : \
