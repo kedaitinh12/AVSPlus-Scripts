@@ -1,5 +1,5 @@
 ###############
-# F3KDB_3 and it sisters v1.339 by real.finder Mod by kedautinh12 2021.09.03 (replace Masktools2 with extools)
+# F3KDB_3 and it sisters v1.339 by real.finder Mod by kedautinh12 2021.09.10 (replace Masktools2 with extools)
 
 
 function F3KDB_3(clip clip, int "range", int "Y", int "Cb", int "Cr", \
@@ -229,8 +229,8 @@ mthr = default(mask_thr, 2)
 mrad = default(mask_radius, 2)
 Assert(mrad > 0, "F3KDB_3_masking: mask_radius must be more than 0")
 
-thr_lo = ex_bs(max(mthr * 0.75, 1) - 0.0001, 8, bi, fulls=fs)
-thr_hi = ex_bs(max(mthr,        1) + 0.0001, 8, bi, fulls=fs)
+thr_lo = ex_bs(max(mthr * 0.75, 1) - 0.0001, 8, bi, tv_in=true, tv_out=tv, fulls=fs)
+thr_hi = ex_bs(max(mthr,        1) + 0.0001, 8, bi, tv_in=true, tv_out=tv, fulls=fs)
 
 c
 mrad > 1 ? ex_luts (mode="range", pixels=ex_shape (mrad, shape="circle"), clamp_float=true, fulls=fs)  : \
