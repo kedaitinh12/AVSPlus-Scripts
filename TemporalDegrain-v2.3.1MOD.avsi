@@ -328,7 +328,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
              (postFFT == 2) ? FFT3DGPU( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, plane=degrainPlane, sigma=postSigma*2/3, bt=postTD ) : \
              (postFFT == 3) ? neo_dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, threads=fftThreads ) : \
              (postFFT == 13)? dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, Y=LumaNoise, U=ChromaNoise, V=ChromaNoise, sigma=postSigma*4, tbsize=postTD, threads=fftThreads, dither=dftDither ) : \
-             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=postSigma, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=device_id ) : \
+             (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=0.5*postSigma, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=device_id ) : \
              (postFFT == 5) ? DT_BM3D( noiseWindow, radius=postTR, sigma=postSigma, CUDA=false, UV=Chr ) : \
              (postFFT == 6) ? DT_BM3D( noiseWindow, radius=postTR, sigma=postSigma, CUDA=true, UV=Chr ) : \
              (postFFT == -1)? noiseWindow.HQDn3D(0,0,4,1) : NOP()
