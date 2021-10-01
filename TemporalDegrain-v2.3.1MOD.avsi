@@ -120,6 +120,8 @@
 # - add BM3D_CPU & BM3D_CUDA (based on BM3D prefilter of Dogway's SMDegrain)
 # Sep 07, 2021: mod by kedautinh12
 # - optimization BM3D (based on BM3D prefilter of Dogway's SMDegrain)
+# Oct 01, 2021: mod by kedautinh12
+# - improve sigma value of BM3D
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
@@ -329,8 +331,8 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
              (postFFT == 3) ? neo_dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, y=LumaNoise?3:2, u=ChromaNoise?3:2, v=ChromaNoise?3:2, sigma=postSigma*4, tbsize=postTD, dither=dftDither, threads=fftThreads ) : \
              (postFFT == 13)? dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, Y=LumaNoise, U=ChromaNoise, V=ChromaNoise, sigma=postSigma*4, tbsize=postTD, threads=fftThreads, dither=dftDither ) : \
              (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=0.5*postSigma, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=device_id ) : \
-             (postFFT == 5) ? DT_BM3D( noiseWindow, radius=postTR, sigma=postSigma, CUDA=false, UV=Chr ) : \
-             (postFFT == 6) ? DT_BM3D( noiseWindow, radius=postTR, sigma=postSigma, CUDA=true, UV=Chr ) : \
+             (postFFT == 5) ? DT_BM3D( noiseWindow, radius=postTR, sigma=2*postSigma, CUDA=false, UV=Chr ) : \
+             (postFFT == 6) ? DT_BM3D( noiseWindow, radius=postTR, sigma=2*postSigma, CUDA=true, UV=Chr ) : \
              (postFFT == -1)? noiseWindow.HQDn3D(0,0,4,1) : NOP()
   dnWindow = dnWindow.SelectEvery( postTD, postTR )
   denoised = forceHiBitProc && postFFT > 0  ? dnWindow.ConvertBits(8,dither=1) : dnWindow
