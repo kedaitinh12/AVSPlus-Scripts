@@ -1,5 +1,5 @@
 ###############
-# F3KDB_3 and it sisters v1.339 by real.finder Mod by kedautinh12 2021.09.10 (replace Masktools2 with extools)
+# F3KDB_3 and it sisters v1.339 by real.finder Mod by kedautinh12 2021.10.21 (replace Masktools2 with extools)
 
 
 function F3KDB_3(clip clip, int "range", int "Y", int "Cb", int "Cr", \
@@ -222,18 +222,23 @@ sisyuy2 ? ConvertToYUY2() : last
 }
 
 
-function F3KDB_3_masking(clip c, float "mask_thr", int "mask_radius")
+function F3KDB_3_masking(clip c, float "mask_thr", int "mask_radius", bool "keep_tv_range", bool "fulls")
 {
 sisavs26     = !(VersionNumber() < 2.60)
+rgb  = isRGB(c)
+bi   = BitsPerComponent(c)
+
 mthr = default(mask_thr, 2)
 mrad = default(mask_radius, 2)
 Assert(mrad > 0, "F3KDB_3_masking: mask_radius must be more than 0")
+tv   = Default(keep_tv_range, false)
+fs   = Default(fulls, rgb)
 
 thr_lo = ex_bs(max(mthr * 0.75, 1) - 0.0001, 8, bi, tv_in=true, tv_out=tv, fulls=fs)
 thr_hi = ex_bs(max(mthr,        1) + 0.0001, 8, bi, tv_in=true, tv_out=tv, fulls=fs)
 
 c
-mrad > 1 ? ex_luts (mode="range", pixels=ex_shape (mrad, shape="circle"), clamp_float=true, fulls=fs)  : \
+mrad > 1 ? ex_luts (mode="range", pixels=ex_shape (mrad, mode="disk"), clamp_float=true, fulls=fs)  : \
                    mt_edge (mode="min/max", thY1=0, thY2=255)
                    ex_lut (Format("x {thr_lo} - {thr_hi} {thr_lo} - / 0 1 clip range_max *"), fulls=fs)
                    removegrain (22, -1)
