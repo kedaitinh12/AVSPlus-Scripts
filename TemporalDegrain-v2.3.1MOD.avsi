@@ -122,6 +122,8 @@
 # - optimization BM3D (based on BM3D prefilter of Dogway's SMDegrain)
 # Oct 01, 2021: mod by kedautinh12
 # - improve sigma value of BM3D
+# Oct 23, 2021: mod by kedautinh12
+# - fix bug with device_id in BM3D
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
@@ -153,7 +155,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
   postSigma=default( postSigma,1.0)         # Strength of the filtering
   postDither=default(postDither,-1)         # any negative value enables 16bit post FFT with a final call to ditherpost, positive values are dithering strength for dfttest
   postMix = default (postMix,   0 )         # increase the value up to 100 if you want less degraining
-  device_id= default(device_id,  0 )
+  device_id = default(device_id,  0 )
 
   fftThreads = default( fftThreads, 1 )     # Number of threads to be used for FFTs
   extraSharp = default( extraSharp, false)  # enable for a moderate over-sharpen, do not use this if you want the output to be as close to the original as possible, only to be used by sharpness junkies
@@ -332,7 +334,7 @@ function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool 
              (postFFT == 13)? dfttest( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, Y=LumaNoise, U=ChromaNoise, V=ChromaNoise, sigma=postSigma*4, tbsize=postTD, threads=fftThreads, dither=dftDither ) : \
              (postFFT == 4) ? DT_KNLMeansCL( forceHiBitProc ? noiseWindow.ConvertBits(16) : noiseWindow, a=2, d=postTR, h=0.5*postSigma, Luma = LumaNoise, Chroma = ChromaNoise, device_type="GPU", device_id=device_id ) : \
              (postFFT == 5) ? DT_BM3D( noiseWindow, radius=postTR, sigma=2*postSigma, CUDA=false, UV=Chr ) : \
-             (postFFT == 6) ? DT_BM3D( noiseWindow, radius=postTR, sigma=2*postSigma, CUDA=true, UV=Chr ) : \
+             (postFFT == 6) ? DT_BM3D( noiseWindow, radius=postTR, sigma=2*postSigma, CUDA=true, UV=Chr, device_id=device_id ) : \
              (postFFT == -1)? noiseWindow.HQDn3D(0,0,4,1) : NOP()
   dnWindow = dnWindow.SelectEvery( postTD, postTR )
   denoised = forceHiBitProc && postFFT > 0  ? dnWindow.ConvertBits(8,dither=1) : dnWindow
@@ -411,7 +413,7 @@ function DT_KNLMeansCL(clip input, String "device_type", int "device_id", bool "
     (Luma && Chroma) ? YToUV(output.ExtractU().BilinearResize(cw,ch), output.ExtractV().BilinearResize(cw,ch), output.ExtractY()) : Luma ? YToUV(uplane, vplane, output) : output
 }
 
-function DT_BM3D(clip a, float "sigma", int "radius", bool "CUDA", int "UV") {
+function DT_BM3D(clip a, float "sigma", int "radius", bool "CUDA", int "UV", int "device_id") {
 
     rgb = isRGB(a)
     isy = isy(a)
@@ -421,6 +423,7 @@ function DT_BM3D(clip a, float "sigma", int "radius", bool "CUDA", int "UV") {
     r  = Default(radius,   1)
     cd = Default(CUDA,  true)
     UV = Default(UV,    rgb ? 3 : 1)
+    device_id = Default(device_id, 0)
 
     ch = !(isy || UV!=3)
     ch ? ConverttoYUV444(a,chromaresample="spline16") : a
