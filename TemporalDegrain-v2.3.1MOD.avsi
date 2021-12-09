@@ -126,6 +126,9 @@
 # - fix bug with device_id in BM3D
 # Nov 12, 2021: mod by kedautinh12
 # - fix artefacts in BM3D
+# Dec 09, 2021: mod by kedautinh12
+# - ex_BM3D() switch 'fulls' arg with 'tv_range' (based on BM3D prefilter of Dogway's SMDegrain)
+# - ex_BM3D() new arg 'OPP' to filter in OPP space as originally intended (based on BM3D prefilter of Dogway's SMDegrain)
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
@@ -415,31 +418,44 @@ function DT_KNLMeansCL(clip input, String "device_type", int "device_id", bool "
     (Luma && Chroma) ? YToUV(output.ExtractU().BilinearResize(cw,ch), output.ExtractV().BilinearResize(cw,ch), output.ExtractY()) : Luma ? YToUV(uplane, vplane, output) : output
 }
 
-function DT_BM3D(clip a, float "sigma", int "radius", bool "CUDA", int "UV", int "device_id") {
+function DT_BM3D(clip a, float "sigma", int "radius", bool "CUDA", int "OPP", int "UV", int "tv_range", int "device_id") {
 
     rgb = isRGB(a)
     isy = isy(a)
     bi  = BitsPerComponent(a)
+    fs  = propNumElements(a,"_ColorRange")  > 0 ? \
+          propGetInt     (a,"_ColorRange") == 0 : rgb
 
-    s  = Default(sigma,    3)
-    r  = Default(radius,   1)
-    cd = Default(CUDA,  true)
-    UV = Default(UV,    rgb ? 3 : 1)
-    device_id = Default(device_id, 0)
+    s   = Default(sigma,    3)
+    r   = Default(radius,   1)
+    cd  = Default(CUDA,  true)
+    OPP = Default(OPP,   rgb)
+    UV  = Default(UV,    rgb ? 3 : 1)
+    tv  = Default(tv_range, !fs)
+	device_id = Default(device_id, 0)
+    r   = min(r,3) # Buggy when r > 3
 
+    a
     ch = !(isy || UV!=3)
-    ch ? ConverttoYUV444(a,chromaresample="spline16") : a
-    ConvertBits(bits=32)
+    ch && !rgb && !OPP ? ConverttoYUV444(chromaresample="spline16")                        : last
+          !rgb &&  OPP ? ConvertToPlanarRGB(!tv?"PC709":"Rec709",chromaresample="spline16") : last
+           rgb ||  OPP ? RGB_to_OPP().ConvertBits(32, fulls=true, fulld=true)              : ConvertBits(32, fulls=!tv, fulld=!tv)
 
-    cd ? BM3D_CUDA(sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch, fast=true, extractor_exp=6, device_id=device_id) : \
-         BM3D_CPU( sigma=[s,ch?s/2:0,ch?s/2:0], radius=r, chroma=ch)
+    cs = rgb || OPP ? s : ch ? s/2 : 0
+
+    cd ? BM3D_CUDA(sigma=[s,cs,cs], radius=r, chroma=ch, fast=true, extractor_exp=6, device_id=device_id) : \
+         BM3D_CPU (sigma=[s,cs,cs], radius=r, chroma=ch)
          BM3D_VAggregate(radius=r)
 
-    if (bi < 32) {
-        ConvertBits(bits=16, dither=-1)
-        ConvertBits(bits=bi, dither= 1)
-    }
-    ch ? MatchColorFormat(a) : mergechroma(a) }
+    if (rgb || OPP) {
+        bi != 32 ? ConvertBits(bi, dither=1, fulls=true, fulld=true) : last
+        OPP_to_RGB()
+        !rgb && OPP ? MatchClip(a)  : last
+    } else if (ch) {
+        MatchClip(a)
+    } else {
+        bi != 32 ? ConvertBits(bi, dither=1, fulls=!tv, fulld=!tv) : last
+        mergechroma(a) } }
     
 # Set global variable called "Prefix_Name" to "Value". Throws exception if global already exists unless Replace=true, in which case the global is overwritten
 function DT_SetUserGlobal( string Prefix, string Name, val Value, bool "Replace" )
