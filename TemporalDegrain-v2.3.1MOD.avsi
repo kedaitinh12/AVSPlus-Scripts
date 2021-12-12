@@ -127,8 +127,8 @@
 # Nov 12, 2021: mod by kedautinh12
 # - fix artefacts in BM3D
 # Dec 09, 2021: mod by kedautinh12
-# - ex_BM3D() switch 'fulls' arg with 'tv_range' (based on BM3D prefilter of Dogway's SMDegrain)
-# - ex_BM3D() new arg 'OPP' to filter in OPP space as originally intended (based on BM3D prefilter of Dogway's SMDegrain)
+# - DT_BM3D() switch 'fulls' arg with 'tv_range' (based on BM3D prefilter of Dogway's SMDegrain)
+# - DT_BM3D() new arg 'OPP' to filter in OPP space as originally intended (based on BM3D prefilter of Dogway's SMDegrain)
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
