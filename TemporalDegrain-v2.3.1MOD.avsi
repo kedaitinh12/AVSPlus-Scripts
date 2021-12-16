@@ -1,29 +1,30 @@
-####################################################################################
-# Temporal Degrain v2.3.1 Updated by ErazorTT                                      #
-#                                                                                  #
-# Function v1.23 by Sagekilla, idea + original script created by Didee             #
-#                                                                                  #
-# Works as a simple temporal degraining function that'll remove                    #
-# MOST or even ALL grain and noise from video sources,                             #
-# including dancing grain, like the grain found on 300.                            #
-# Also note, the parameters don't need to be tweaked much.                         #
-#                                                                                  #
-# Required plugins:                                                                #
-# neo_fft3d: https://github.com/HomeOfAviSynthPlusEvolution/neo_FFT3D/releases     #
-# MaskTools2: https://github.com/pinterf/masktools/releases                        #
-# MVtools2 (mt_*): https://github.com/pinterf/mvtools/releases                     #
-# rgTools (RemoveGrain,Repair): https://github.com/pinterf/RgTools/releases        #
-#                                                                                  #
-# Optional plugins:                                                                #
-# Dither tools: http://avisynth.nl/index.php/Dither_tools                          #
-# neo_dfttest: https://github.com/HomeOfAviSynthPlusEvolution/neo_DFTTest/releases #
-# KNLMeansCL: https://github.com/pinterf/KNLMeansCL/releases                       #
-# BM3D: https://github.com/WolframRhodium/VapourSynth-BM3DCUDA/issues/7            #
-# FFT3DGPU: https://github.com/pinterf/FFT3dGPU/releases                           #
-# HQdn3D: http://avisynth.nl/index.php/Hqdn3d                                      #
-# old FFT3DFilter: https://github.com/pinterf/fft3dfilter/releases                 #
-# old dfttest: https://github.com/pinterf/dfttest                                  #
-####################################################################################
+##############################################################################################
+# Temporal Degrain v2.3.1 Updated by ErazorTT                                                #
+#                                                                                            #
+# Function v1.23 by Sagekilla, idea + original script created by Didee                       #
+#                                                                                            #
+# Works as a simple temporal degraining function that'll remove                              #
+# MOST or even ALL grain and noise from video sources,                                       #
+# including dancing grain, like the grain found on 300.                                      #
+# Also note, the parameters don't need to be tweaked much.                                   #
+#                                                                                            #
+# Required plugins:                                                                          #
+# neo_fft3d: https://github.com/HomeOfAviSynthPlusEvolution/neo_FFT3D/releases               #
+# MaskTools2: https://github.com/pinterf/masktools/releases                                  #
+# MVtools2 (mt_*): https://github.com/pinterf/mvtools/releases                               #
+# rgTools (RemoveGrain,Repair): https://github.com/pinterf/RgTools/releases                  #
+#                                                                                            #
+# Optional plugins:                                                                          #
+# Dither tools: http://avisynth.nl/index.php/Dither_tools                                    #
+# neo_dfttest: https://github.com/HomeOfAviSynthPlusEvolution/neo_DFTTest/releases           #
+# KNLMeansCL: https://github.com/pinterf/KNLMeansCL/releases                                 #
+# BM3D: https://github.com/WolframRhodium/VapourSynth-BM3DCUDA/issues/7                      #
+# TransformsPack: https://github.com/Dogway/Avisynth-Scripts/blob/master/TransformsPack.avsi #
+# FFT3DGPU: https://github.com/pinterf/FFT3dGPU/releases                                     #
+# HQdn3D: http://avisynth.nl/index.php/Hqdn3d                                                #
+# old FFT3DFilter: https://github.com/pinterf/fft3dfilter/releases                           #
+# old dfttest: https://github.com/pinterf/dfttest                                            #
+##############################################################################################
 
 # recommendations to be followed for each new movie:
 # 1. start with default settings
@@ -129,6 +130,8 @@
 # Dec 09, 2021: mod by kedautinh12
 # - DT_BM3D() switch 'fulls' arg with 'tv_range' (based on BM3D prefilter of Dogway's SMDegrain)
 # - DT_BM3D() new arg 'OPP' to filter in OPP space as originally intended (based on BM3D prefilter of Dogway's SMDegrain)
+# Dec 16, 2021: mod by kedautinh12
+# - Forgot add TransformsPack.avsi to Optional plugins
 
 function TemporalDegrain2 ( clip input, int "degrainTR", int "grainLevel", bool "grainLevelSetup", int "degrainPlane", int "postFFT", int "postTR", float "postSigma", int "postDither", int "postMix", \
     int "meAlg", int "meAlgPar", int "meSubpel", int "meBlksz", bool "meTM", bool "meChroma", int "limitFFT", float "limitSigma", int "limitBlksz", int "fftThreads", \
