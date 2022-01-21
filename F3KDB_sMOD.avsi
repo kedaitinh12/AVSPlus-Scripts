@@ -1,5 +1,5 @@
 ###############
-# F3KDB_3 and it sisters v1.339 by real.finder Mod by kedautinh12 2021.10.21 (replace Masktools2 with extools)
+# F3KDB_3 and it sisters v1.340 by real.finder Mod by kedautinh12 2021.10.21 (replace Masktools2 with extools)
 
 
 function F3KDB_3(clip clip, int "range", int "Y", int "Cb", int "Cr", \
@@ -53,7 +53,7 @@ pclip = masking && (nlpmsk ? pass < 2 : true) && outd2 != input_depth ? pclip.co
 
 masking && (nlpmsk ? pass < 2 : true) ? ex_merge(last,pclip,pclip.F3KDB_3_masking(mask_thr, mask_radius), UV=chroma ? 3 : 2, luma=chroma) : last
 
-noutput_mode==1 ? pclip.convertbits(16,false).ConvertToStacked() : noutput_mode==2 ? pclip.convertbits(16,false).ConvertToDoubleWidth() : last
+noutput_mode==1 ? convertbits(16,false).ConvertToStacked() : noutput_mode==2 ? convertbits(16,false).ConvertToDoubleWidth() : last
 
         pass > 1 ? last.F3KDB_3(range, Y, Cb, Cr, \
 		ngrainY, grainC, sample_mode, seed, \
