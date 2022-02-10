@@ -6,7 +6,7 @@
 ###                                             ###
 ###              v0.4 - 21 May 2012             ###
 ###                                             ###
-###      mod by kedautinh12 - 05 July 2021      ###
+###     mod by kedautinh12 - 10 February 2022   ###
 ###                                             ###
 ###################################################
 ###
@@ -47,9 +47,12 @@
 ### | CHANGELOG |
 ### +-----------+
 ###
-### mod - 05 July 2021
-###     - Replace MaskTools2 with ExTools
-###     - Replace f3db with F3KDB_3
+### mod  - 10 February 2022
+###      - Add support adapt variable scaled to HBD (thank Dogway)
+###
+### mod  - 05 July 2021
+###      - Replace MaskTools2 with ExTools
+###      - Replace f3db with F3KDB_3
 ###
 ### v0.4 - 21 May 2012
 ###      - Add support for 8-bit YV16/YV24
@@ -80,15 +83,16 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
   Assert( temp>=0 && temp<=100,    "f3kgrain: invalid value for temp(0~100)!"   )
   Assert( adapt>=-1 && adapt<=255, "f3kgrain: invalid value for adapt(-1~255)!" )
 
-  Y = luma==0 ? 2 : 3
+  Y = luma  ==0 ? 2 : 3
   U = chroma==0 ? 2 : 3
   V = chroma==0 ? 2 : 3
-
+  adaptHBD = ex_bs(adapt, 8, bi, true)
+  
   Lclip = lsb ? input.f3kg_get_msb : input
 
   Lmask = adapt==0   ? Lclip.RemoveGrain(19, -1)
   \     : adapt==255 ? Lclip.ex_invert(UV=1).RemoveGrain(19, -1)
-  \     :              Lclip.ex_lut("x "+string(adapt)+" - abs 255 * "+string(adapt)+" 128 - abs 128 + /", UV=1).RemoveGrain(19, -1)
+  \     :              Lclip.ex_lut(Format("x {adaptHBD} - abs range_max * {adaptHBD} range_half - abs range_half + /"), UV=1, fulls=true).RemoveGrain(19, -1)
 
   grain = Lclip.BlankClip(color_yuv=$808080).F3KDB_3(Y=0, Cb=0, Cr=0, grainY=luma, grainC=chroma, dynamic_grain=true, random_algo_grain=mode, random_param_grain=sigma)
 
@@ -107,7 +111,7 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
 
   adsoft = lsb ? Dither_add16(input, gmerge.f3kg_convert_8_to_16, dif=true, Y=Y, U=U, V=V) : ex_adddiff(input, gmerge, Y=Y, UV=U)
 
-  b_luma = chroma!=0 && ( Lmask.IsYV12 || lsb ) ? True : False
+  b_luma = chroma!=0 && ( Lmask.Is420 || lsb ) ? True : False
   Lmask  = !b_luma && chroma!=0 ? Lmask.MergeChroma( Lmask.YToUV(Lmask).BilinearResize(Lmask.width, Lmask.height) )
   \	                            : Lmask
 
