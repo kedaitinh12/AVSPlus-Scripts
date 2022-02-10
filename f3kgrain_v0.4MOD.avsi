@@ -86,6 +86,7 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
   Y = luma  ==0 ? 2 : 3
   U = chroma==0 ? 2 : 3
   V = chroma==0 ? 2 : 3
+  bi = BitsPerComponent(input)
   adaptHBD = ex_bs(adapt, 8, bi, true)
   
   Lclip = lsb ? input.f3kg_get_msb : input
