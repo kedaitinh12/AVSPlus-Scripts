@@ -37,7 +37,7 @@
 ### -> dither            [v1.17.0]
 ###
 ###    Scipts:
-### -> F3KDB_s           [v1.3+] (https://raw.githubusercontent.com/realfinder/AVS-Stuff/Community/avs%202.5%20and%20up/F3KDB_s.avsi)
+### -> F3KDB_sMOD        [v1.3+] (https://github.com/kedaitinh12/AVSPlus-Scripts/blob/master/F3KDB_sMOD.avsi)
 ### -> Zs_RF_Shared      [1.154+] https://raw.githubusercontent.com/realfinder/AVS-Stuff/Community/avs%202.5%20and%20up/Zs_RF_Shared.avsi)
 ### -> mt_xxpand_multi
 ### -> dither
@@ -86,7 +86,6 @@ Function f3kgrain(clip input, int "luma", int "chroma", int "mode", int "temp", 
   Y = luma  ==0 ? 2 : 3
   U = chroma==0 ? 2 : 3
   V = chroma==0 ? 2 : 3
-  bi = BitsPerComponent(input)
   adaptHBD = ex_bs(adapt, 8, bi, true)
   
   Lclip = lsb ? input.f3kg_get_msb : input
